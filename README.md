@@ -124,18 +124,6 @@ A typical workflow might involve sequentially running the four scripts:
 ` python refindlc/position_filter.py --input likelihood_filtered.csv --output position_filtered.csv --method euclidean --threshold 30 `
 ` python refindlc/interpolate.py --input position_filtered.csv --output final_data.csv --method cubic --max_gap 5 `
 
-## Code Structure
-
-RefineDLC/
-├── README.md
-├── requirements.txt
-├── setup.py
-└── refindlc/
-    ├── __init__.py
-    ├── clean_coordinates.py
-    ├── likelihood_filter.py
-    ├── position_filter.py
-    └── interpolate.py
 
 ## Contributing
 
