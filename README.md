@@ -52,9 +52,9 @@ Ensure you have Python 3.10 or higher installed. It is recommended to use a virt
 Clean raw DeepLabCut coordinate data by inverting y-coordinates, removing zero rows, and excluding irrelevant body parts.
 
 ```
-python refindlc/clean_coordinates.py \
-    --input path/to/raw_coordinates.csv \
-    --output path/to/cleaned_coordinates.csv \
+python refineDLC/clean_coordinates.py 
+    --input path/to/raw_coordinates.csv 
+    --output path/to/cleaned_coordinates.csv 
     --exclude "bodypart1, bodypart2"
 ```
 
@@ -68,9 +68,9 @@ python refindlc/clean_coordinates.py \
 Filter data based on likelihood scores.
 
 ```
-python refindlc/likelihood_filter.py \
-    --input path/to/cleaned_coordinates.csv \
-    --output path/to/likelihood_filtered.csv \
+python refineDLC/likelihood_filter.py 
+    --input path/to/cleaned_coordinates.csv 
+    --output path/to/likelihood_filtered.csv 
     --threshold 0.6
 ```
 
@@ -84,10 +84,10 @@ python refindlc/likelihood_filter.py \
 Filter data based on positional changes between consecutive frames.
 
 ```
-python refindlc/position_filter.py \
-    --input path/to/likelihood_filtered.csv \
-    --output path/to/position_filtered.csv \
-    --method euclidean \
+python refineDLC/position_filter.py 
+    --input path/to/likelihood_filtered.csv 
+    --output path/to/position_filtered.csv 
+    --method euclidean 
     --threshold 30
 ```
 
@@ -102,10 +102,10 @@ Arguments:
 Interpolate missing data points after filtering.
 
 ```
-python refindlc/interpolate.py \
-    --input path/to/position_filtered.csv \
-    --output path/to/interpolated_data.csv \
-    --method cubic \
+python refineDLC/interpolate.py 
+    --input path/to/position_filtered.csv 
+    --output path/to/interpolated_data.csv 
+    --method cubic 
     --max_gap 5
 ```
 
@@ -119,13 +119,13 @@ Arguments:
 
 A typical workflow might involve sequentially running the four scripts:
 
-` python refinedlc/clean_coordinates.py --input raw_data.csv --output cleaned_data.csv --exclude "bodypart1,bodypart2"` \
+` python refineDLC/clean_coordinates.py --input raw_data.csv --output cleaned_data.csv --exclude "bodypart1,bodypart2"` 
 
-` python refindlc/likelihood_filter.py --input cleaned_data.csv --output likelihood_filtered.csv --threshold 0.6 ` \
+` python refineDLC/likelihood_filter.py --input cleaned_data.csv --output likelihood_filtered.csv --threshold 0.6 ` 
 
-` python refindlc/position_filter.py --input likelihood_filtered.csv --output position_filtered.csv --method euclidean --threshold 30 ` \
+` python refineDLC/position_filter.py --input likelihood_filtered.csv --output position_filtered.csv --method euclidean --threshold 30 ` 
 
-` python refindlc/interpolate.py --input position_filtered.csv --output final_data.csv --method cubic --max_gap 5 ` \
+` python refineDLC/interpolate.py --input position_filtered.csv --output final_data.csv --method cubic --max_gap 5 ` 
 
 
 ## Contributing
