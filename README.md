@@ -139,3 +139,21 @@ This project is licensed under the MIT License. See the LICENSE file for details
 ## Acknowledgments
 
 This pipeline was developed to enhance the usability of DeepLabCut outputs by providing a standardized, automated post-processing solution. It builds upon recent advances in markerless tracking and kinematic analysis.
+
+## Structure
+
+RefineDLC \
+├── README.md \
+├── setup.py \ 
+├── requirements.txt \
+├── LICENSE \ 
+├── .gitignore \ 
+├── refinedlc \
+│   ├── __init__.py \ 
+│   ├── clean_coordinates.py \
+│   ├── likelihood_filter.py \ 
+│   ├── position_filter.py \
+│   └── interpolate.py \
+└── tests \
+    ├── test_clean_coordinates.py \ 
+    └── (other test scripts) \
