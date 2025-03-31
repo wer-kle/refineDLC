@@ -119,10 +119,13 @@ Arguments:
 
 A typical workflow might involve sequentially running the four scripts:
 
-` python refinedlc/clean_coordinates.py --input raw_data.csv --output cleaned_data.csv --exclude "bodypart1,bodypart2"`
-` python refindlc/likelihood_filter.py --input cleaned_data.csv --output likelihood_filtered.csv --threshold 0.6 `
-` python refindlc/position_filter.py --input likelihood_filtered.csv --output position_filtered.csv --method euclidean --threshold 30 `
-` python refindlc/interpolate.py --input position_filtered.csv --output final_data.csv --method cubic --max_gap 5 `
+` python refinedlc/clean_coordinates.py --input raw_data.csv --output cleaned_data.csv --exclude "bodypart1,bodypart2"` \
+
+` python refindlc/likelihood_filter.py --input cleaned_data.csv --output likelihood_filtered.csv --threshold 0.6 ` \
+
+` python refindlc/position_filter.py --input likelihood_filtered.csv --output position_filtered.csv --method euclidean --threshold 30 ` \
+
+` python refindlc/interpolate.py --input position_filtered.csv --output final_data.csv --method cubic --max_gap 5 ` \
 
 
 ## Contributing
