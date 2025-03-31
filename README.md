@@ -142,18 +142,23 @@ This pipeline was developed to enhance the usability of DeepLabCut outputs by pr
 
 ## Structure
 
-RefineDLC \
-├── README.md \
-├── setup.py \ 
-├── requirements.txt \
-├── LICENSE \ 
-├── .gitignore \ 
-├── refinedlc \
-│   ├── __init__.py \ 
-│   ├── clean_coordinates.py \
-│   ├── likelihood_filter.py \ 
-│   ├── position_filter.py \
-│   └── interpolate.py \
-└── tests \
-    ├── test_clean_coordinates.py \ 
-    └── (other test scripts) \
+This repository contains the following structure:
+
+```text
+RefineDLC/
+├── README.md
+├── setup.py
+├── requirements.txt
+├── LICENSE
+├── .gitignore
+├── refinedlc/
+│   ├── __init__.py
+│   ├── clean_coordinates.py
+│   ├── likelihood_filter.py
+│   ├── position_filter.py
+│   └── interpolate.py
+└── tests/
+    ├── test_clean_coordinates.py
+    ├── test_likelihood_filter.py
+    ├── test_position_filter.py
+    └── test_interpolate.py
