@@ -21,7 +21,7 @@ Ensure you have Python 3.10 or higher installed. It is recommended to use a virt
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/refineDLC.git
+   git clone https://github.com/wer-kle/refineDLC.git
    cd refineDLC
    ```
 
