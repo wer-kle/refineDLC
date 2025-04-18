@@ -7,19 +7,6 @@ Cleans DeepLabCut coordinate data by:
 - Removing rows with all zero values (indicative of corrupted frames)
 - Excluding specified irrelevant body parts
 - Iterating over a directory of CSV files if desired
-
-Usage:
-    # Single file mode
-    python clean_coordinates.py \
-        --input raw_data.csv \
-        --output cleaned_data.csv \
-        --exclude "handler_leg1,handler_leg2"
-
-    # Batch directory mode
-    python clean_coordinates.py \
-        --input-dir path/to/raw_csvs/ \
-        --output-dir path/to/cleaned_csvs/ \
-        --exclude "handler_leg1,handler_leg2"
 """
 
 import argparse
@@ -32,82 +19,92 @@ import glob
 
 def clean_coordinates(input_file: str, output_file: str, exclude_parts: str):
     logging.info("Loading data from %s", input_file)
+
+    # --- 1) Read the three header rows so we get a true MultiIndex --- #
     try:
-        data = pd.read_csv(input_file)
+        raw = pd.read_csv(input_file, header=[0, 1, 2])
     except Exception as e:
         logging.error("Failed to load input file %s: %s", input_file, e)
         raise
 
-    # Invert y-coordinates (assuming columns end with '_y')
-    y_columns = [col for col in data.columns if col.endswith('_y')]
-    for col in y_columns:
-        logging.info("Inverting y-coordinates in column %s", col)
-        max_y = data[col].max()
-        data[col] = max_y - data[col]
+    # --- 2) Flatten the MultiIndex to simple names like "left_eye_x", "left_eye_y" --- #
+    #     We drop the first level (scorer/model) and join the bodypart + coord.
+    raw.columns = [
+        f"{bodypart.strip()}_{coord.strip()}"
+        for (_, bodypart, coord) in raw.columns
+    ]
 
-    # Remove rows where all coordinate values are zero
-    coord_columns = [col for col in data.columns if '_' in col]
-    initial_count = len(data)
-    data = data.loc[~(data[coord_columns] == 0).all(axis=1)]
-    removed = initial_count - len(data)
-    logging.info("Removed %d zero-value rows", removed)
+    data = raw.copy()  # now data.columns are strings ending in "_x", "_y", or "_likelihood"
 
-    # Exclude irrelevant body parts
+    # --- 3) Detect all '_y' columns and invert via max_y - y --- #
+    y_cols = [c for c in data.columns if c.lower().endswith('_y')]
+    if not y_cols:
+        logging.warning("No '_y' columns found to invert.")
+    else:
+        for col in y_cols:
+            max_y = data[col].max()
+            logging.info("Inverting y in column %s (max_y=%s)", col, max_y)
+            data[col] = max_y - data[col]
+
+    # --- 4) Remove rows where *all* coordinate columns are zero --- #
+    coord_cols = [c for c in data.columns if '_' in c]
+    before = len(data)
+    data = data.loc[~(data[coord_cols] == 0).all(axis=1)]
+    logging.info("Removed %d all‐zero rows", before - len(data))
+
+    # --- 5) Drop any bodyparts the user wants to exclude --- #
     if exclude_parts:
-        exclude_list = [part.strip() for part in exclude_parts.split(',')]
-        logging.info("Excluding body parts: %s", exclude_list)
-        for part in exclude_list:
-            cols_to_drop = [col for col in data.columns if col.startswith(part)]
-            if cols_to_drop:
-                data.drop(columns=cols_to_drop, inplace=True, errors='ignore')
-                logging.info("Dropped columns: %s", cols_to_drop)
+        to_exclude = [p.strip() for p in exclude_parts.split(',')]
+        logging.info("Excluding parts: %s", to_exclude)
+        for part in to_exclude:
+            drops = [c for c in data.columns if c.startswith(part + "_")]
+            if drops:
+                data.drop(columns=drops, inplace=True, errors='ignore')
+                logging.info("Dropped columns: %s", drops)
 
-    # Ensure output directory exists
+    # --- 6) Write out --- #
     out_dir = os.path.dirname(output_file)
     if out_dir and not os.path.exists(out_dir):
         os.makedirs(out_dir, exist_ok=True)
 
     logging.info("Saving cleaned data to %s", output_file)
     data.to_csv(output_file, index=False)
-    logging.info("Data cleaning for %s completed.", input_file)
+    logging.info("Done cleaning %s", input_file)
 
 
 def process_file(input_path: str, output_dir: str, exclude_parts: str):
-    """Helper to clean a single CSV and save it into the output directory."""
     filename = Path(input_path).name
-    output_path = Path(output_dir) / filename
-    clean_coordinates(str(input_path), str(output_path), exclude_parts)
+    clean_coordinates(str(input_path), str(Path(output_dir) / filename), exclude_parts)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Clean DeepLabCut coordinate data in single or batch mode.")
+    parser = argparse.ArgumentParser(
+        description="Clean DeepLabCut coordinate data in single or batch mode."
+    )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--input', help="Path to a single input CSV file.")
-    group.add_argument('--input-dir', help="Path to a directory containing CSV files.")
+    group.add_argument('--input',     help="Path to a single input CSV file.")
+    group.add_argument('--input-dir', help="Path to a directory of CSVs.")
 
-    parser.add_argument('--output', help="Path to a single output CSV file (with --input). ")
-    parser.add_argument('--output-dir', help="Directory to save cleaned CSVs (with --input-dir). ")
-    parser.add_argument('--exclude', default="", help="Comma-separated list of body parts to exclude.")
+    parser.add_argument('--output',     help="Output CSV (with --input).")
+    parser.add_argument('--output-dir', help="Output directory (with --input-dir).")
+    parser.add_argument('--exclude',    default="", help="Comma‑sep list of bodyparts to drop.")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
     if args.input:
         if not args.output:
-            parser.error('--output is required when using --input')
+            parser.error('--output is required with --input')
         clean_coordinates(args.input, args.output, args.exclude)
     else:
         if not args.output_dir:
-            parser.error('--output-dir is required when using --input-dir')
+            parser.error('--output-dir is required with --input-dir')
         os.makedirs(args.output_dir, exist_ok=True)
-
-        pattern = os.path.join(args.input_dir, '*.csv')
-        files = glob.glob(pattern)
-        logging.info("Found %d CSV files in %s", len(files), args.input_dir)
-
-        for file_path in files:
-            logging.info("Processing file %s", file_path)
-            process_file(file_path, args.output_dir, args.exclude)
+        files = glob.glob(os.path.join(args.input_dir, '*.csv'))
+        logging.info("Found %d files in %s", len(files), args.input_dir)
+        for f in files:
+            logging.info("Processing %s", f)
+            process_file(f, args.output_dir, args.exclude)
 
 
 if __name__ == "__main__":
