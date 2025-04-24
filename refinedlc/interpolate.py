@@ -55,6 +55,7 @@ def interpolate_data(input_file: str, output_file: str, method: str, max_gap: in
         series = data[col]
         valid = series.dropna()
 
+        # Determine if fallback to linear is needed
         use_method = method
         if len(valid) < min_points.get(method, 2):
             logging.warning(
@@ -68,12 +69,17 @@ def interpolate_data(input_file: str, output_file: str, method: str, max_gap: in
             col, use_method, max_gap
         )
 
-        # Use pandas interpolation with gap limit
+        # Perform interpolation for interior gaps
         series_interp = series.interpolate(
             method=use_method,
             limit=max_gap,
             limit_direction='both'
         )
+        
+        # Fill leading/trailing small gaps via backward/forward fill
+        series_interp = series_interp.fillna(method='bfill', limit=max_gap)
+        series_interp = series_interp.fillna(method='ffill', limit=max_gap)
+
         data_interpolated[col] = series_interp
 
     logging.info("Saving interpolated data to %s", output_file)
