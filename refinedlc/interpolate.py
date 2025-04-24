@@ -4,7 +4,7 @@ interpolate.py
 
 Interpolates missing data points in DeepLabCut coordinate data.
 Supports various interpolation methods and limits interpolation to gaps no larger than a user-defined maximum.
-Supports single-file or batch-directory processing.
+Supports single-file or batch-directory processing, with diagnostic logging of NaN counts before and after.
 
 Usage:
     # Single-file mode
@@ -31,7 +31,7 @@ from pathlib import Path
 
 
 def interpolate_data(input_file: str, output_file: str, method: str, max_gap: int):
-    logging.info("Loading data from %s", input_file)
+    logging.info("=== interpolate_data start for %s ===", input_file)
     try:
         data = pd.read_csv(input_file)
     except Exception as e:
@@ -53,7 +53,9 @@ def interpolate_data(input_file: str, output_file: str, method: str, max_gap: in
 
     for col in coord_columns:
         series = data[col]
+        before_nans = series.isna().sum()
         valid = series.dropna()
+        logging.info("Column '%s': %d NaNs before interpolation", col, before_nans)
 
         # Determine if fallback to linear is needed
         use_method = method
@@ -70,21 +72,23 @@ def interpolate_data(input_file: str, output_file: str, method: str, max_gap: in
         )
 
         # Perform interpolation for interior gaps
-        series_interp = series.interpolate(
+        interp_series = series.interpolate(
             method=use_method,
             limit=max_gap,
             limit_direction='both'
         )
-        
         # Fill leading/trailing small gaps via backward/forward fill
-        series_interp = series_interp.fillna(method='bfill', limit=max_gap)
-        series_interp = series_interp.fillna(method='ffill', limit=max_gap)
+        interp_series = interp_series.fillna(method='bfill', limit=max_gap)
+        interp_series = interp_series.fillna(method='ffill', limit=max_gap)
 
-        data_interpolated[col] = series_interp
+        after_nans = interp_series.isna().sum()
+        logging.info("Column '%s': %d NaNs after interpolation", col, after_nans)
+
+        data_interpolated[col] = interp_series
 
     logging.info("Saving interpolated data to %s", output_file)
     data_interpolated.to_csv(output_file, index=False)
-    logging.info("Interpolation completed for %s", input_file)
+    logging.info("=== interpolate_data end for %s ===", input_file)
 
 
 def process_file(input_path: str, output_dir: str, method: str, max_gap: int):
@@ -95,7 +99,7 @@ def process_file(input_path: str, output_dir: str, method: str, max_gap: int):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Interpolate missing data points in DeepLabCut data (single-file or batch)."
+        description="Interpolate missing data points in DeepLabCut data (single-file or batch) with diagnostics."
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--input', help="Path to a single position-filtered CSV file.")
