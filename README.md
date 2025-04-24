@@ -126,6 +126,11 @@ python refineDLC/position_filter.py --input-dir ./likelihood/ --output-dir ./pos
 python refineDLC/interpolate.py --input-dir ./position/ --output-dir ./interpolated/ --method cubic --max_gap 5
 ```
 
+## Preprint
+A preprint describing this pipeline is available on bioRxiv:
+
+Weronika Klecel, Hadley Rahael, Samantha A. Brooks (2025). *refineDLC: an advanced post-processing pipeline for DeepLabCut outputs*. bioRxiv. https://doi.org/10.1101/2025.04.09.648046
+
 ## Repository Structure
 ```
 refineDLC/
