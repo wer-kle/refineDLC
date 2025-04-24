@@ -25,11 +25,9 @@ Usage:
 import argparse
 import logging
 import pandas as pd
-import numpy as np
 import os
 import glob
 from pathlib import Path
-from scipy.interpolate import interp1d
 
 
 def interpolate_data(input_file: str, output_file: str, method: str, max_gap: int):
@@ -43,46 +41,47 @@ def interpolate_data(input_file: str, output_file: str, method: str, max_gap: in
     coord_columns = [col for col in data.columns if col.endswith('_x') or col.endswith('_y')]
     data_interpolated = data.copy()
 
+    # Minimum valid points required per method
+    min_points = {
+        'nearest': 2,
+        'linear': 2,
+        'zero': 2,
+        'slinear': 2,
+        'quadratic': 3,
+        'cubic': 4
+    }
+
     for col in coord_columns:
-        logging.info("Interpolating column %s using method '%s'", col, method)
         series = data[col]
-        isnan = series.isna()
-        valid = series[~isnan]
-        if len(valid) < 2:
-            logging.warning("Not enough data points in column %s to interpolate.", col)
-            continue
+        valid = series.dropna()
 
-        interp_func = interp1d(valid.index, valid.values, kind=method,
-                               bounds_error=False, fill_value="extrapolate")
-        interpolated_values = interp_func(np.arange(len(series)))
+        use_method = method
+        if len(valid) < min_points.get(method, 2):
+            logging.warning(
+                "Column %s has only %d valid points; falling back to linear interpolation.",
+                col, len(valid)
+            )
+            use_method = 'linear'
 
-        series_interp = series.copy()
-        isnan_array = isnan.to_numpy()
-        i = 0
-        while i < len(series_interp):
-            if isnan_array[i]:
-                start = i
-                while i < len(series_interp) and isnan_array[i]:
-                    i += 1
-                gap_length = i - start
-                if gap_length <= max_gap:
-                    series_interp[start:i] = interpolated_values[start:i]
-                else:
-                    logging.info(
-                        "Gap from index %d to %d (length %d) exceeds max_gap; left as NaN.",
-                        start, i-1, gap_length
-                    )
-            else:
-                i += 1
+        logging.info(
+            "Interpolating column %s with method '%s' and max_gap=%d", 
+            col, use_method, max_gap
+        )
+
+        # Use pandas interpolation with gap limit
+        series_interp = series.interpolate(
+            method=use_method,
+            limit=max_gap,
+            limit_direction='both'
+        )
         data_interpolated[col] = series_interp
 
     logging.info("Saving interpolated data to %s", output_file)
     data_interpolated.to_csv(output_file, index=False)
-    logging.info("Interpolation completed for %s.", input_file)
+    logging.info("Interpolation completed for %s", input_file)
 
 
 def process_file(input_path: str, output_dir: str, method: str, max_gap: int):
-    """Helper: apply interpolation to a single CSV and save into the output directory."""
     filename = Path(input_path).name
     output_path = Path(output_dir) / filename
     interpolate_data(str(input_path), str(output_path), method, max_gap)
@@ -90,13 +89,13 @@ def process_file(input_path: str, output_dir: str, method: str, max_gap: int):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Interpolate missing data points in DeepLabCut data in single or batch mode."
+        description="Interpolate missing data points in DeepLabCut data (single-file or batch)."
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--input', help="Path to a single position-filtered CSV file.")
     group.add_argument('--input-dir', help="Directory containing position-filtered CSV files.")
 
-    parser.add_argument('--output', help="Path to save single output CSV.")
+    parser.add_argument('--output', help="Path to save a single output CSV.")
     parser.add_argument('--output-dir', help="Directory to save batch output CSVs.")
     parser.add_argument(
         '--method',
@@ -106,7 +105,7 @@ def main():
     )
     parser.add_argument(
         '--max_gap', type=int, default=5,
-        help="Maximum number of consecutive frames to interpolate (default: 5)."
+        help="Maximum consecutive NaNs to fill (default: 5)."
     )
     args = parser.parse_args()
 
@@ -124,9 +123,9 @@ def main():
         pattern = os.path.join(args.input_dir, '*.csv')
         files = glob.glob(pattern)
         logging.info("Found %d CSV files in %s", len(files), args.input_dir)
-        for file_path in files:
-            logging.info("Processing file %s", file_path)
-            process_file(file_path, args.output_dir, args.method, args.max_gap)
+        for input_path in files:
+            logging.info("Processing file %s", input_path)
+            process_file(input_path, args.output_dir, args.method, args.max_gap)
 
 
 if __name__ == "__main__":
