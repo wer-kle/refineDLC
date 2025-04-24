@@ -3,7 +3,7 @@
 likelihood_filter.py
 
 Filters DeepLabCut data based on likelihood scores.
-Low likelihood values (below a threshold specified by user) are set to NaN for both likelihood and associated coordinate columns.
+Low likelihood values (below a threshold specified by user) result in NaNs **only** in coordinate columns; likelihood values are retained.
 Supports single-file or batch-directory processing.
 
 Usage:
@@ -44,15 +44,15 @@ def likelihood_filter(input_file: str, output_file: str, threshold: float):
         return
 
     for col in likelihood_cols:
-        logging.info("Filtering column %s with threshold %.2f", col, threshold)
-        # Set low-likelihood values to NaN
+        logging.info("Applying threshold filter on %s (threshold=%.2f)", col, threshold)
+        # Create mask for low-likelihood frames; keep likelihood values untouched
         mask = data[col] < threshold
-        data.loc[mask, col] = pd.NA
-        # Also set the corresponding coordinate columns to NaN
-        base = col.replace('_likelihood', '')
+        base = col[:-len('_likelihood')]
+        # Only set coordinate columns to NaN
         for suffix in ['_x', '_y']:
             coord_col = f"{base}{suffix}"
             if coord_col in data.columns:
+                logging.debug("Setting NaN for %s in %d frames", coord_col, mask.sum())
                 data.loc[mask, coord_col] = pd.NA
 
     logging.info("Saving likelihood-filtered data to %s", output_file)
@@ -79,7 +79,7 @@ def main():
     parser.add_argument('--output-dir', help="Directory to save batch outputs.")
     parser.add_argument(
         '--threshold', type=float, required=True,
-        help="Likelihood threshold below which values are set to NaN."
+        help="Likelihood threshold below which coordinates are set to NaN."
     )
     args = parser.parse_args()
 
@@ -89,7 +89,6 @@ def main():
         if not args.output:
             parser.error('--output is required when using --input')
         likelihood_filter(args.input, args.output, args.threshold)
-
     else:
         if not args.output_dir:
             parser.error('--output-dir is required when using --input-dir')
@@ -98,7 +97,6 @@ def main():
         pattern = os.path.join(args.input_dir, '*.csv')
         files = glob.glob(pattern)
         logging.info("Found %d CSV files in %s", len(files), args.input_dir)
-
         for file_path in files:
             logging.info("Processing file %s", file_path)
             process_file(file_path, args.output_dir, args.threshold)
