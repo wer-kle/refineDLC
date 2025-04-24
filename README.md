@@ -1,24 +1,17 @@
 # refineDLC: Advanced Post-Processing Pipeline for DeepLabCut Outputs
 
 ## Overview
-**RefineDLC** is a comprehensive, modular, and user-friendly pipeline designed to process raw DeepLabCut coordinate outputs. The pipeline cleans, filters, and interpolates the data to remove noise and false positives, delivering datasets that are ready for kinematic analysis.
-
-The package comprises four main scripts:
-- **clean_coordinates.py**: Inverts y-coordinates, removes zero-value rows, excludes specified body parts, and supports single-file or batch-directory processing.
-- **likelihood_filter.py**: Filters out data points with low likelihood scores.
-- **position_filter.py**: Removes frames exhibiting physiologically improbable positional changes.
-- **interpolate.py**: Interpolates missing data points using a variety of methods.
+**RefineDLC** is a modular, command-line toolkit that processes raw DeepLabCut coordinate outputs through four standalone Python scripts. Each script supports both single-file and batch-directory modes, enabling scalable pipelines for kinematic data cleaning, filtering, and interpolation.
 
 ## Features
-- **Modular Design:** Each processing step is implemented as a standalone script.
-- **Batch & Single-File Modes:** `clean_coordinates.py` can process one CSV or an entire directory of CSVs in one run.
-- **Command-Line Interface:** Each script accepts well-documented command-line arguments.
-- **Logging & Error Handling:** Progress is logged and common errors are handled gracefully.
-- **Flexible Filtering:** Adjustable thresholds and methods allow the pipeline to be tailored to your dataset.
-- **Multiple Interpolation Options:** Choose from several interpolation techniques depending on your needs.
+- **Modular CLI Tools:** Clean, filter, and interpolate in separate, composable steps.
+- **Single-File & Batch Modes:** Glob all `.csv` in a folder or target one file.
+- **Logging & Error Handling:** Informative logs at each step, with graceful fallbacks.
+- **Flexible Thresholds & Methods:** Adjustable parameters for cleaning, likelihood filtering, movement thresholds, and interpolation methods.
+- **Directory Processing:** Automatic directory creation and filename preservation.
 
 ## Installation
-Ensure you have Python 3.10 or higher installed. It is recommended to use a virtual environment.
+Requires Python 3.10 or higher. A virtual environment is recommended.
 
 1. **Clone the repository:**
    ```bash
@@ -29,23 +22,23 @@ Ensure you have Python 3.10 or higher installed. It is recommended to use a virt
    ```bash
    pip install -r requirements.txt
    ```
-3. **(Optional) Install the package:**
+3. **(Optional) Install in editable mode:**
    ```bash
    pip install -e .
    ```
 
 ## Requirements
-- `Python 3.10+`
-- `pandas`
-- `numpy`
-- `scipy`
-- `matplotlib` (optional for visualization)
+- Python 3.10+
+- pandas
+- numpy
+- scipy
+- matplotlib (optional)
 
 ## Usage
+All scripts live in the `refineDLC/` package and can be invoked directly or via `-m refineDLC.<script>`.
 
 ### 1. Clean Coordinates
-
-Clean raw DeepLabCut coordinate data by inverting y-coordinates, removing zero rows, and excluding body parts.
+Invert y-coordinates, remove all-zero rows, and exclude unwanted body parts.
 
 **Single-File Mode**
 ```bash
@@ -63,15 +56,10 @@ python refineDLC/clean_coordinates.py \
   --exclude "bodypart1,bodypart2"
 ```
 
-**Arguments:**
-- `--input` / `--input-dir`: Path to a single CSV file or directory of CSV files.
-- `--output` / `--output-dir`: Path for the cleaned CSV or directory to save cleaned CSVs.
-- `--exclude`: (Optional) Comma-separated list of body parts to drop.
-
 ### 2. Likelihood Filtering
+Mask out coordinate values where likelihood falls below a threshold; likelihood columns are retained.
 
-Filter data based on likelihood scores.
-
+**Single-File Mode**
 ```bash
 python refineDLC/likelihood_filter.py \
   --input path/to/cleaned_coordinates.csv \
@@ -79,10 +67,18 @@ python refineDLC/likelihood_filter.py \
   --threshold 0.6
 ```
 
+**Batch-Directory Mode**
+```bash
+python refineDLC/likelihood_filter.py \
+  --input-dir path/to/cleaned_csvs/ \
+  --output-dir path/to/likelihood_filtered_csvs/ \
+  --threshold 0.6
+```
+
 ### 3. Position Filtering
+Set coordinate cells to NaN when positional change between frames exceeds a pixel threshold.
 
-Remove physiologically improbable positional changes.
-
+**Single-File Mode**
 ```bash
 python refineDLC/position_filter.py \
   --input path/to/likelihood_filtered.csv \
@@ -91,10 +87,19 @@ python refineDLC/position_filter.py \
   --threshold 30
 ```
 
+**Batch-Directory Mode**
+```bash
+python refineDLC/position_filter.py \
+  --input-dir path/to/likelihood_filtered_csvs/ \
+  --output-dir path/to/position_filtered_csvs/ \
+  --method x \
+  --threshold 15
+```
+
 ### 4. Interpolation
+Interpolate missing coordinate values (NaNs) up to a maximum gap size using various spline or linear methods.
 
-Interpolate missing data points after filtering.
-
+**Single-File Mode**
 ```bash
 python refineDLC/interpolate.py \
   --input path/to/position_filtered.csv \
@@ -103,18 +108,26 @@ python refineDLC/interpolate.py \
   --max_gap 5
 ```
 
-## Example Workflow
-
+**Batch-Directory Mode**
 ```bash
-python refineDLC/clean_coordinates.py --input raw_data.csv --output cleaned_data.csv --exclude "bodypart1,bodypart2"
-python refineDLC/likelihood_filter.py --input cleaned_data.csv --output likelihood_filtered.csv --threshold 0.6
-python refineDLC/position_filter.py --input likelihood_filtered.csv --output position_filtered.csv --method euclidean --threshold 30
-python refineDLC/interpolate.py --input position_filtered.csv --output final_data.csv --method cubic --max_gap 5
+python refineDLC/interpolate.py \
+  --input-dir path/to/position_filtered_csvs/ \
+  --output-dir path/to/interpolated_csvs/ \
+  --method cubic \
+  --max_gap 5
 ```
 
-## Structure
+## Example Workflow
+Combine all steps in sequence:
+```bash
+python refineDLC/clean_coordinates.py --input raw.csv --output cleaned.csv --exclude "part1,part2"
+python refineDLC/likelihood_filter.py --input cleaned.csv --output likelihood.csv --threshold 0.6
+python refineDLC/position_filter.py --input-dir ./likelihood/ --output-dir ./position/ --method euclidean --threshold 30
+python refineDLC/interpolate.py --input-dir ./position/ --output-dir ./interpolated/ --method cubic --max_gap 5
+```
 
-```text
+## Repository Structure
+```
 refineDLC/
 ├── README.md
 ├── setup.py
@@ -134,3 +147,5 @@ refineDLC/
     └── test_interpolate.py
 ```
 
+—
+*RefineDLC provides a standardized, automated post-processing workflow for DeepLabCut outputs, enhancing reproducibility and efficiency in kinematic analyses.*
