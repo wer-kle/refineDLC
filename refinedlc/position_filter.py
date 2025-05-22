@@ -2,118 +2,181 @@
 """
 position_filter.py
 
-Filters DeepLabCut data based on positional changes between consecutive frames.
-If the change in position for a body part exceeds a user-defined threshold, the coordinates are set to NaN.
-Supports single-file or batch-directory processing.
+Filters DeepLabCut CSV outputs by removing non-organic outliers in positional changes
+between consecutive frames. Supports both fixed-threshold filtering and robust statistical
+outlier detection (modified Z-score via MAD or Tukey IQR fences).
 
-Usage:
-    # Single-file mode
-    python position_filter.py \
-        --input likelihood_filtered.csv \
-        --output position_filtered.csv \
-        --method euclidean \
-        --threshold 30
+Key features:
+  - Single-file or batch-directory processing
+  - Choice of difference metric: euclidean (default), x-axis, or y-axis changes
+  - Fixed threshold mode (--threshold)
+  - Robust mode (--stat-method = mad|iqr) with tunable cutoffs
 
-    # Batch-directory mode
-    python position_filter.py \
-        --input-dir path/to/likelihood_filtered_csvs/ \
-        --output-dir path/to/position_filtered_csvs/ \
-        --method euclidean \
-        --threshold 30
+Usage examples:
+  # Fixed threshold (simple):
+  python position_filter.py \
+      --input-dir dlc_csvs/ --output-dir cleaned_csvs/ \
+      --method euclidean --threshold 30
+
+  # Robust MAD (default) in batch:
+  python position_filter.py \
+      --input-dir dlc_csvs/ --output-dir cleaned_csvs/ \
+      --method euclidean --stat-method mad --mad-threshold 3.5
+
+  # Single file with IQR fences:
+  python position_filter.py \
+      --input in.csv --output out.csv \
+      --method x --stat-method iqr --iqr-multiplier 2.0
 """
 
 import argparse
 import logging
-import pandas as pd
-import numpy as np
 import os
 import glob
 from pathlib import Path
+import numpy as np
+import pandas as pd
 
 
-def position_filter(input_file: str, output_file: str, method: str, threshold: float):
-    logging.info("Loading data from %s", input_file)
-    try:
-        data = pd.read_csv(input_file)
-    except Exception as e:
-        logging.error("Failed to load input file %s: %s", input_file, e)
-        raise
+def detect_outliers(diff: np.ndarray,
+                    stat_method: str = 'mad',
+                    mad_threshold: float = 3.5,
+                    iqr_multiplier: float = 1.5) -> np.ndarray:
+    """
+    Return boolean mask for outliers in diff array.
+    Pads first frame with 0-change, then applies:
+      - 'mad': modified Z-score > mad_threshold
+      - 'iqr': values outside [Q1 - m*IQR, Q3 + m*IQR]
+    """
+    # prepend zero change for first frame
+    diff_full = np.insert(diff, 0, 0.0)
+    if stat_method == 'mad':
+        med = np.median(diff_full)
+        mad = np.median(np.abs(diff_full - med))
+        mad = mad if mad else np.finfo(float).eps
+        mod_z = 0.6745 * (diff_full - med) / mad
+        return np.abs(mod_z) > mad_threshold
 
-    body_parts = set(col.rsplit('_', 1)[0] for col in data.columns if col.endswith('_x'))
-    for part in body_parts:
-        x_col = f"{part}_x"
-        y_col = f"{part}_y"
-        if x_col not in data.columns or y_col not in data.columns:
+    if stat_method == 'iqr':
+        q1, q3 = np.percentile(diff_full, [25, 75])
+        iqr = q3 - q1
+        lower, upper = q1 - iqr_multiplier * iqr, q3 + iqr_multiplier * iqr
+        return (diff_full < lower) | (diff_full > upper)
+
+    raise ValueError(f"Unknown stat_method '{stat_method}'")
+
+
+def position_filter(infile: str,
+                    outfile: str,
+                    method: str,
+                    mode: str,
+                    threshold: float = None,
+                    mad_threshold: float = None,
+                    iqr_multiplier: float = None):
+    """
+    Load CSV, detect outliers in positional jumps per bodypart,
+    and set those X/Y pairs to NaN. Save cleaned CSV.
+
+    mode: 'threshold' or 'robust'
+    threshold: float for fixed mode
+    robust: uses mad_threshold or iqr_multiplier
+    """
+    logging.info(f"Loading data: {infile}")
+    df = pd.read_csv(infile)
+    parts = {col.rsplit('_', 1)[0] for col in df.columns if col.endswith('_x')}
+
+    for part in sorted(parts):
+        xcol, ycol = f"{part}_x", f"{part}_y"
+        if xcol not in df or ycol not in df:
             continue
-
-        logging.info("Filtering positional changes for body part: %s", part)
-        x = data[x_col].to_numpy()
-        y = data[y_col].to_numpy()
+        logging.info(f"  Processing '{part}' using method={method}, mode={mode}")
+        x = df[xcol].to_numpy(dtype=float)
+        y = df[ycol].to_numpy(dtype=float)
+        # compute differences
         if method == 'euclidean':
-            diff = np.sqrt(np.diff(x)**2 + np.diff(y)**2)
+            diffs = np.sqrt(np.diff(x)**2 + np.diff(y)**2)
         elif method == 'x':
-            diff = np.abs(np.diff(x))
+            diffs = np.abs(np.diff(x))
         elif method == 'y':
-            diff = np.abs(np.diff(y))
+            diffs = np.abs(np.diff(y))
         else:
-            logging.error("Invalid method: %s. Use 'euclidean', 'x', or 'y'.", method)
-            raise ValueError(f"Invalid method: {method}")
+            raise ValueError(f"Invalid method '{method}'")
 
-        diff = np.insert(diff, 0, 0)
-        mask = diff > threshold
-        data.loc[mask, x_col] = pd.NA
-        data.loc[mask, y_col] = pd.NA
-        logging.info("For body part %s, filtered %d frames based on positional change.", part, mask.sum())
+        if mode == 'threshold':
+            mask = np.insert(diffs > threshold, 0, False)
+        else:
+            # robust mode uses detect_outliers
+            mask = detect_outliers(diffs,
+                                   stat_method=mode,
+                                   mad_threshold=mad_threshold,
+                                   iqr_multiplier=iqr_multiplier)
 
-    logging.info("Saving position-filtered data to %s", output_file)
-    data.to_csv(output_file, index=False)
-    logging.info("Position filtering completed for %s.", input_file)
+        df.loc[mask, xcol] = pd.NA
+        df.loc[mask, ycol] = pd.NA
+        logging.info(f"    Removed {mask.sum()} outlier frames for '{part}'")
 
-
-def process_file(input_path: str, output_dir: str, method: str, threshold: float):
-    """Helper: apply filtering to a single CSV and save it into the output directory."""
-    filename = Path(input_path).name
-    output_path = Path(output_dir) / filename
-    position_filter(str(input_path), str(output_path), method, threshold)
+    os.makedirs(Path(outfile).parent or '.', exist_ok=True)
+    logging.info(f"Saving cleaned data to {outfile}")
+    df.to_csv(outfile, index=False)
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Filter DeepLabCut data by positional change in single or batch mode."
+    p = argparse.ArgumentParser(
+        description="Filter DLC data by positional change (fixed or robust methods)"
     )
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--input', help="Path to a single CSV file with likelihood-filtered data.")
-    group.add_argument('--input-dir', help="Directory containing CSV files to filter.")
+    grp = p.add_mutually_exclusive_group(required=True)
+    grp.add_argument('--input', help="Single input CSV file")
+    grp.add_argument('--input-dir', help="Directory of CSV files to filter")
 
-    parser.add_argument('--output', help="Path to save single output CSV.")
-    parser.add_argument('--output-dir', help="Directory to save batch output CSVs.")
-    parser.add_argument(
-        '--method', choices=['euclidean', 'x', 'y'], required=True,
-        help="Filtering method: 'euclidean', 'x', or 'y'."
-    )
-    parser.add_argument(
-        '--threshold', type=float, required=True,
-        help="Threshold for positional change (in pixels)."
-    )
-    args = parser.parse_args()
+    p.add_argument('--output', help="Single output CSV file path")
+    p.add_argument('--output-dir', help="Directory to save batch output CSVs")
 
+    p.add_argument('--method', choices=['euclidean','x','y'], required=True,
+                   help="Difference metric: euclidean, x, or y")
+
+    det = p.add_mutually_exclusive_group(required=True)
+    det.add_argument('--threshold', type=float,
+                     help="Fixed threshold for positional change")
+    det.add_argument('--stat-method', choices=['mad','iqr'],
+                     help="Robust outlier detection via 'mad' or 'iqr'")
+
+    p.add_argument('--mad-threshold', type=float, default=3.5,
+                   help="Modified-Z cutoff if using --stat-method mad (default 3.5)")
+    p.add_argument('--iqr-multiplier', type=float, default=1.5,
+                   help="IQR multiplier if using --stat-method iqr (default 1.5)")
+
+    args = p.parse_args()
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
+    # Determine mode
+    if args.threshold is not None:
+        mode = 'threshold'
+    else:
+        mode = args.stat_method
+
+    # Single-file
     if args.input:
         if not args.output:
-            parser.error('--output is required when using --input')
-        position_filter(args.input, args.output, args.method, args.threshold)
+            p.error("--output is required with --input")
+        position_filter(args.input, args.output,
+                        args.method, mode,
+                        threshold=args.threshold,
+                        mad_threshold=args.mad_threshold,
+                        iqr_multiplier=args.iqr_multiplier)
     else:
         if not args.output_dir:
-            parser.error('--output-dir is required when using --input-dir')
+            p.error("--output-dir is required with --input-dir")
         os.makedirs(args.output_dir, exist_ok=True)
-
-        pattern = os.path.join(args.input_dir, '*.csv')
+        pattern = os.path.join(args.input_dir, "*.csv")
         files = glob.glob(pattern)
-        logging.info("Found %d CSV files in %s", len(files), args.input_dir)
-        for file_path in files:
-            logging.info("Processing file %s", file_path)
-            process_file(file_path, args.output_dir, args.method, args.threshold)
+        logging.info(f"Found {len(files)} CSV(s) in {args.input_dir}")
+        for infile in sorted(files):
+            outfile = os.path.join(args.output_dir, Path(infile).name)
+            position_filter(infile, outfile,
+                            args.method, mode,
+                            threshold=args.threshold,
+                            mad_threshold=args.mad_threshold,
+                            iqr_multiplier=args.iqr_multiplier)
 
 
 if __name__ == "__main__":
