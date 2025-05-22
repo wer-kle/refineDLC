@@ -6,14 +6,21 @@
 
 ## Installation
 
-1. Ensure **Python 3.10+** is installed.
-2. Create and activate a virtual environment (optional, but recommended).
-3. Install dependencies:
+1. **Clone the repository** into your local machine:
+   
+   ```
+   git clone https://github.com/wer-kle/refineDLC.git
+   cd refineDLC
+   ```
+   
+3. Ensure **Python 3.10+** is installed.
+4. Create and activate a virtual environment (optional, but recommended).
+5. Install dependencies:
 
    ```bash
    pip install -r requirements.txt
    ```
-4. (Optional) Install in editable mode:
+6. (Optional) Install in editable mode:
 
    ```bash
    pip install -e .
