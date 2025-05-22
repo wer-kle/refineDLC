@@ -142,8 +142,8 @@ Interpolate NaN gaps up to `max_gap` frames using linear or spline.
 
 * `--input/--input-dir`
 * `--output/--output-dir`
-* `--method <linear|cubic|spline>`
-* `--max-gap <int>`
+* `--method <linear|zero|slinear|cubic|spline>`
+* `--max_gap <int>`
 
 ## Examples
 
