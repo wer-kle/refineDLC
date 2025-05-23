@@ -7,6 +7,7 @@
 ## Installation
 
 1. Ensure **Python 3.10+** is installed.
+
 2. Create and activate a virtual environment (highly recommended):
 
    ```bash
@@ -14,19 +15,20 @@
    source refineDLC/bin/activate   # Mac/Linux
    refineDLC\\Scripts\\activate  # Windows
    ```
-   
+
 3. **Clone the repository** into your activated environment:
-   
+
    ```bash
    git clone https://github.com/wer-kle/refineDLC.git
    cd refineDLC
    ```
-   
+
 4. Install dependencies:
 
    ```bash
    pip install -r requirements.txt
    ```
+
 5. (Optional) Install in editable mode:
 
    ```bash
@@ -79,11 +81,9 @@ python refineDLC/<script_name>.py [OPTIONS]
 ### Input Modes (mutually exclusive)
 
 * `--input <FILE.csv>`
-
-  * Process a single CSV.
+  Process a single CSV.
 * `--input-dir <DIR>`
-
-  * Process all `*.csv` in the specified directory.
+  Process all `*.csv` in the specified directory.
 
 ### Output Targets
 
@@ -108,13 +108,16 @@ Invert Y-values, remove rows of all zeros, and exclude specified landmarks.
 
 #### 2. likelihood\_filter.py
 
-Mask coordinates where likelihood < threshold.
+Mask coordinates based on likelihood: either remove frames below a fixed threshold or remove a percentage of lowest values per column.
 
 **Options**
 
 * `--input/--input-dir`
 * `--output/--output-dir`
-* `--threshold <float>` (default: 0.7)
+* Mutually exclusive:
+
+  * `--threshold <float>`: fixed likelihood threshold below which coordinates are set to NaN (default: 0.7).
+  * `--percentile <float>`: remove frames with likelihood in the lowest N% per column (e.g., `--percentile 10` for the lowest 10%).
 
 #### 3. position\_filter.py
 
@@ -151,7 +154,7 @@ Interpolate NaN gaps up to `max_gap` frames using linear or spline.
 
 ```bash
 python refineDLC/clean_coordinates.py --input raw.csv --output cleaned.csv --exclude "nose,tail"
-python refineDLC/likelihood_filter.py --input cleaned.csv --output lik.pdf --threshold 0.6
+python refineDLC/likelihood_filter.py --input cleaned.csv --output lik.csv --threshold 0.6
 python refineDLC/position_filter.py --input lik.csv --output pos.csv --method euclidean --threshold 30
 python refineDLC/interpolate.py --input pos.csv --output interp.csv --method cubic --max-gap 5
 ```
@@ -163,6 +166,12 @@ python refineDLC/clean_coordinates.py --input-dir raw_csvs/ --output-dir cleaned
 python refineDLC/likelihood_filter.py --input-dir cleaned_csvs/ --output-dir lik_csvs/ --threshold 0.6
 python refineDLC/position_filter.py --input-dir lik_csvs/ --output-dir pos_csvs/ --method euclidean --stat-method mad
 python refineDLC/interpolate.py --input-dir pos_csvs/ --output-dir interp_csvs/ --method linear --max-gap 3
+```
+
+3. **Using percentile-based filtering**
+
+```bash
+python refineDLC/likelihood_filter.py --input cleaned.csv --output filtered.csv --percentile 10
 ```
 
 ## Citation
