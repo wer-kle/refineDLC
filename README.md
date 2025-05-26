@@ -131,9 +131,10 @@ Remove positional outliers by fixed threshold or robust statistics.
 * Mutually exclusive:
 
   * `--threshold <float>` (fixed)
-  * `--stat-method <mad|iqr>`
+  * `--stat-method <std|mad|iqr>`
 * Additional (robust):
 
+  * `--std-threshold <float>` (default: 3.0)
   * `--mad-threshold <float>` (default: 3.5)
   * `--iqr-multiplier <float>` (default: 1.5)
 
