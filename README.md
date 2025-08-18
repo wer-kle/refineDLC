@@ -179,4 +179,7 @@ python refineDLC/likelihood_filter.py --input cleaned.csv --output filtered.csv 
 
 Weronika Klecel, Hadley Rahael, Samantha A. Brooks (2025). *refineDLC: an advanced post-processing pipeline for DeepLabCut outputs*. bioRxiv. [https://doi.org/10.1101/2025.04.09.648046](https://doi.org/10.1101/2025.04.09.648046)
 
----
+## Data availability
+
+The datasets used for validation of the presented software are available on [Zenodo](https://doi.org/10.5281/zenodo.15186150).
+
