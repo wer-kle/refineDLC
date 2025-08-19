@@ -1,4 +1,4 @@
-pandas
-numpy
-scipy
-matplotlib
+numpy>=1.23
+pandas>=1.5
+matplotlib>=3.6
+pytest>=7.0
