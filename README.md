@@ -1,47 +1,39 @@
+
+
 # refineDLC
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+---
 
 ## Overview
 
-**refineDLC** is a modular, command-line based toolkit for post-processing DeepLabCut coordinate outputs. It comprises four standalone Python scripts: `clean_coordinates.py`, `likelihood_filter.py`, `position_filter.py`, and `interpolate.py`—each supporting single-file and batch-directory modes. This pipeline enhances reproducibility by standardizing cleaning, filtering, outlier removal, and interpolation.
+**refineDLC** is a modular, command-line based toolkit for post-processing DeepLabCut coordinate outputs.
+It comprises five standalone Python scripts:
+`clean_coordinates.py`, `likelihood_filter.py`, `position_filter.py`, `interpolate.py`, and `plot_trajectories.py`—each supporting single-file and batch-directory modes.
+This pipeline enhances reproducibility by standardizing cleaning, filtering, outlier removal, interpolation, and visualization of trajectories.
+
+---
 
 ## Installation
 
-1. Ensure **Python 3.10+** is installed.
+1. Ensure **Python 3.10+** is installed.
+2. Create and activate a virtual environment (highly recommended).
+3. Clone the repository.
+4. Install dependencies with `pip install -r requirements.txt`.
+5. (Optional) Install in editable mode: `pip install -e .`
 
-2. Create and activate a virtual environment (highly recommended):
-
-   ```bash
-   python3 -m venv refineDLC
-   source refineDLC/bin/activate   # Mac/Linux
-   refineDLC\\Scripts\\activate  # Windows
-   ```
-
-3. **Clone the repository** into your activated environment:
-
-   ```bash
-   git clone https://github.com/wer-kle/refineDLC.git
-   cd refineDLC
-   ```
-
-4. Install dependencies:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-5. (Optional) Install in editable mode:
-
-   ```bash
-   pip install -e .
-   ```
+---
 
 ## Requirements
 
-* Python 3.10 or higher
+* Python 3.10 or higher
 * pandas
 * numpy
 * scipy
 * matplotlib
+
+---
 
 ## Repository Structure
 
@@ -56,17 +48,21 @@ refineDLC/
 │   ├── clean_coordinates.py
 │   ├── likelihood_filter.py
 │   ├── position_filter.py
-│   └── interpolate.py
+│   ├── interpolate.py
+│   └── plot_trajectories.py
 └── tests/
     ├── test_clean_coordinates.py
     ├── test_likelihood_filter.py
     ├── test_position_filter.py
-    └── test_interpolate.py
+    ├── test_interpolate.py
+    └── test_plot_trajectories.py
 ```
+
+---
 
 ## Usage
 
-All scripts are invocable via:
+All scripts can be invoked via:
 
 ```bash
 python -m refineDLC.<script_name> [OPTIONS]
@@ -80,78 +76,53 @@ python refineDLC/<script_name>.py [OPTIONS]
 
 ### Input Modes (mutually exclusive)
 
-* `--input <FILE.csv>`
-  Process a single CSV.
-* `--input-dir <DIR>`
-  Process all `*.csv` in the specified directory.
+* `--input <FILE.csv>` : process a single CSV
+* `--input-dir <DIR>` : process all `*.csv` in the specified directory
 
 ### Output Targets
 
-* With `--input`, specify:
+* With `--input` → `--output <FILE.csv>`
+* With `--input-dir` → `--output-dir <DIR>`
 
-  * `--output <FILE.csv>`
-* With `--input-dir`, specify:
+---
 
-  * `--output-dir <DIR>`
+## Script Summaries
 
-### Script Summaries
-
-#### 1. clean\_coordinates.py
+### 1. clean\_coordinates.py
 
 Invert Y-values, remove rows of all zeros, and exclude specified landmarks.
 
-**Options**
+### 2. likelihood\_filter.py
 
-* `--input/--input-dir`
-* `--output/--output-dir`
-* `--exclude "part1,part2,..."`
+Mask coordinates based on likelihood (threshold or percentile).
 
-#### 2. likelihood\_filter.py
+### 3. position\_filter.py
 
-Mask coordinates based on likelihood: either remove frames below a fixed threshold or remove a percentage of lowest values per column.
+Remove positional outliers (threshold or robust statistics).
 
-**Options**
-
-* `--input/--input-dir`
-* `--output/--output-dir`
-* Mutually exclusive:
-
-  * `--threshold <float>`: fixed likelihood threshold below which coordinates are set to NaN (default: 0.7).
-  * `--percentile <float>`: remove frames with likelihood in the lowest N% per column (e.g., `--percentile 10` for the lowest 10%).
-
-#### 3. position\_filter.py
-
-Remove positional outliers by fixed threshold or robust statistics.
-
-**Options**
-
-* `--input/--input-dir`
-* `--output/--output-dir`
-* `--method <euclidean|x|y>`
-* Mutually exclusive:
-
-  * `--threshold <float>` (fixed)
-  * `--stat-method <std|mad|iqr>`
-* Additional (robust):
-
-  * `--std-threshold <float>` (default: 3.0)
-  * `--mad-threshold <float>` (default: 3.5)
-  * `--iqr-multiplier <float>` (default: 1.5)
-
-#### 4. interpolate.py
+### 4. interpolate.py
 
 Interpolate NaN gaps up to `max_gap` frames using linear or spline.
 
-**Options**
+### 5. plot\_trajectories.py
+
+Generate **displacement-over-time** plots and/or **2D XY trajectory** plots for specified bodyparts from DeepLabCut outputs with single-row headers (`<bodypart>_x`, `<bodypart>_y`, `<bodypart>_likelihood`).
+
+**Options:**
 
 * `--input/--input-dir`
-* `--output/--output-dir`
-* `--method <linear|zero|slinear|cubic|spline>`
-* `--max_gap <int>`
+* `--bodyparts "bp1,bp2,..."`
+* `--output-dir <DIR>` (required)
+* `--color <str>` (default: `"blue"`)
+* `--plot-displacement`
+* `--plot-trajectory`
+  *(if neither flag is provided, both are generated)*
+
+---
 
 ## Examples
 
-1. **Full pipeline on single files**
+### Full pipeline on single files
 
 ```bash
 python refineDLC/clean_coordinates.py --input raw.csv --output cleaned.csv --exclude "nose,tail"
@@ -160,7 +131,7 @@ python refineDLC/position_filter.py --input lik.csv --output pos.csv --method eu
 python refineDLC/interpolate.py --input pos.csv --output interp.csv --method cubic --max-gap 5
 ```
 
-2. **Batch pipeline**
+### Batch pipeline
 
 ```bash
 python refineDLC/clean_coordinates.py --input-dir raw_csvs/ --output-dir cleaned_csvs/ --exclude "elbow,knee"
@@ -169,17 +140,35 @@ python refineDLC/position_filter.py --input-dir lik_csvs/ --output-dir pos_csvs/
 python refineDLC/interpolate.py --input-dir pos_csvs/ --output-dir interp_csvs/ --method linear --max-gap 3
 ```
 
-3. **Using percentile-based filtering**
+### Percentile-based filtering
 
 ```bash
 python refineDLC/likelihood_filter.py --input cleaned.csv --output filtered.csv --percentile 10
 ```
 
+### Trajectory plotting
+
+```bash
+# Single file, both displacement and trajectory
+python refineDLC/plot_trajectories.py --input interp.csv --bodyparts withers,stifle --output-dir plots/
+
+# Batch mode, displacement only, custom color
+python refineDLC/plot_trajectories.py --input-dir interp_csvs/ --bodyparts withers,stifle --plot-displacement --color magenta --output-dir plots/
+```
+
+---
+
 ## Citation
 
-Weronika Klecel, Hadley Rahael, Samantha A. Brooks (2025). *refineDLC: an advanced post-processing pipeline for DeepLabCut outputs*. bioRxiv. [https://doi.org/10.1101/2025.04.09.648046](https://doi.org/10.1101/2025.04.09.648046)
+Weronika Klecel, Hadley Rahael, Samantha A. Brooks (2025).
+*refineDLC: an advanced post-processing pipeline for DeepLabCut outputs*.
+bioRxiv. [https://doi.org/10.1101/2025.04.09.648046](https://doi.org/10.1101/2025.04.09.648046)
+
+---
 
 ## Data availability
 
 The datasets used for validation of the presented software are available on [Zenodo](https://doi.org/10.5281/zenodo.15186150).
+
+---
 
